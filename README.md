@@ -117,6 +117,8 @@ HTML: `/login`, `/register`, `/admin/users`
 
 ## Deploy to FastAPI Cloud
 
+The [`examples/cloud`](examples/cloud) app ships with a demo **Security Awareness** course (SCORM 1.2) built via [LXPack](https://github.com/eddiethedean/lxpack). It is loaded automatically on first startup.
+
 ```bash
 cd examples/cloud
 pip install -r requirements.txt

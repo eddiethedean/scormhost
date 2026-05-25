@@ -9,3 +9,5 @@ dist/
 build/
 .fastapicloud/
 .env
+examples/cloud/node_modules/
+examples/cloud/course/.lxpack/

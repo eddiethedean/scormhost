@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,13 +12,20 @@ from scormhost.host import ScormHost
 from scormhost.migrate import run_migrations
 
 
-@asynccontextmanager
-async def _lifespan(app: FastAPI):
-    settings: HostSettings = app.state.settings
-    init_engine(settings)
-    if settings.auto_migrate:
-        run_migrations(settings.database_url)
-    yield
+def _lifespan_factory(
+    startup_hook: Callable[[HostSettings], None] | None,
+):
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        settings: HostSettings = app.state.settings
+        init_engine(settings)
+        if settings.auto_migrate:
+            run_migrations(settings.database_url)
+        if startup_hook is not None:
+            startup_hook(settings)
+        yield
+
+    return _lifespan
 
 
 def create_scorm_app(
@@ -32,6 +40,7 @@ def create_scorm_app(
     allow_registration: bool = True,
     auto_migrate: bool = True,
     api_prefix: str | None = None,
+    startup_hook: Callable[[HostSettings], None] | None = None,
 ) -> FastAPI:
     """
     Create a FastAPI app that hosts SCORM 1.2 / 2004 ZIP packages.
@@ -71,7 +80,7 @@ def create_scorm_app(
             "Public SCORM host with optional accounts for progress and management"
         ),
         version="0.1.0",
-        lifespan=_lifespan,
+        lifespan=_lifespan_factory(startup_hook),
     )
     app.state.settings = settings
     ScormHost(settings).mount(app)

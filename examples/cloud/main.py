@@ -11,6 +11,8 @@ Set ``SCORMHOST_DATA_DIR`` in the cloud dashboard for persistent uploads.
 
 import os
 
+from seed import seed_bundled_course
+
 from scormhost import create_scorm_app
 
 app = create_scorm_app(
@@ -18,4 +20,5 @@ app = create_scorm_app(
     title=os.environ.get("SCORMHOST_TITLE", "SCORM Host"),
     allow_upload=os.environ.get("SCORMHOST_ALLOW_UPLOAD", "true").lower()
     not in ("0", "false", "no"),
+    startup_hook=seed_bundled_course,
 )

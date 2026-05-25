@@ -1,0 +1,25 @@
+title: Security Awareness
+version: 1.0.0
+description: An LXPack learning experience on security fundamentals
+
+runtime:
+  theme: modern
+
+tracking:
+  completion:
+    threshold: 0.9
+
+lessons:
+  - id: welcome
+    title: Welcome
+    type: markdown
+    file: lessons/welcome.md
+
+  - id: phishing-lab
+    title: Phishing Lab
+    type: html
+    path: interactions/phishing-lab
+
+assessments:
+  - id: final_quiz
+    file: assessments/final.yaml

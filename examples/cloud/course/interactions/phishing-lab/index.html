@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phishing Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --lab-bg: #f8fafc;
+      --lab-surface: #fff;
+      --lab-text: #0f172a;
+      --lab-muted: #64748b;
+      --lab-border: #e2e8f0;
+      --lab-accent: #2563eb;
+      --lab-radius: 12px;
+      --lab-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto;
+      max-width: 36rem;
+      padding: 2rem 1.5rem;
+      font-family: var(--lab-font);
+      background: var(--lab-bg);
+      color: var(--lab-text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    p { margin: 0 0 1.25rem; color: var(--lab-muted); }
+    .email {
+      border: 1px solid var(--lab-border);
+      padding: 1.25rem;
+      border-radius: var(--lab-radius);
+      cursor: pointer;
+      background: var(--lab-surface);
+      box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .email:hover, .email:focus-visible {
+      border-color: var(--lab-accent);
+      box-shadow: 0 4px 14px rgb(37 99 235 / 14%);
+      outline: none;
+    }
+    .result { margin-top: 1rem; padding: 1rem 1.15rem; border-radius: var(--lab-radius); display: none; }
+    .result.show { display: block; }
+    .danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  </style>
+</head>
+<body>
+  <h1>Phishing Detection Lab</h1>
+  <p>Click the suspicious email below to report it.</p>
+  <div class="email" id="phishing-email" role="button" tabindex="0" aria-label="Suspicious email from unknown sender">
+    <strong>From:</strong> security@paypa1-verify.com<br>
+    <strong>Subject:</strong> URGENT: Your account will be suspended<br>
+    <p>Click here immediately to verify your identity...</p>
+  </div>
+  <div class="result" id="result"></div>
+  <script>
+    const email = document.getElementById('phishing-email');
+    const result = document.getElementById('result');
+    email.addEventListener('click', () => {
+      result.className = 'result show danger';
+      result.textContent = 'Correct! This is a phishing attempt. Look for misspelled domains and urgency tactics.';
+      if (window.parent.lxpack) {
+        window.parent.lxpack.track({ type: 'interaction', id: 'phishing-lab' });
+      }
+    });
+    email.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); email.click(); }
+    });
+  </script>
+</body>
+</html>

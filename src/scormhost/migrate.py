@@ -26,6 +26,11 @@ def _alembic_config(database_url: str | None = None) -> Config:
         cfg = Config()
         cfg.set_main_option("script_location", str(_ALEMBIC_DIR))
         cfg.set_main_option("version_path_separator", "os")
+    else:
+        script_location = cfg.get_main_option("script_location")
+        if script_location and not Path(script_location).is_absolute():
+            base = Path(cfg.config_file_name).resolve().parent if cfg.config_file_name else _REPO_ROOT
+            cfg.set_main_option("script_location", str((base / script_location).resolve()))
     if database_url:
         cfg.set_main_option("sqlalchemy.url", database_url)
     return cfg
