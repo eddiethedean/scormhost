@@ -1,0 +1,19 @@
+[project]
+name = "scormhost-cloud-example"
+version = "0.1.0"
+description = "Example FastAPI Cloud deployment for scormhost"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi[standard]>=0.115.0",
+  "scormhost",
+]
+
+[tool.uv.sources]
+scormhost = { path = "../..", editable = true }
+
+[tool.fastapi]
+entrypoint = "main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
