@@ -2,13 +2,34 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
+
+from alembic import command
+
+_PACKAGE_DIR = Path(__file__).resolve().parent
+_ALEMBIC_DIR = _PACKAGE_DIR / "alembic"
+_REPO_ROOT = _PACKAGE_DIR.parent.parent
+
+
+def _alembic_config(database_url: str | None = None) -> Config:
+    """Load Alembic config from the repo (dev) or the installed package."""
+    ini_candidates = (
+        _REPO_ROOT / "alembic.ini",
+        _PACKAGE_DIR / "alembic.ini",
+    )
+    cfg: Config | None = None
+    for ini_path in ini_candidates:
+        if ini_path.is_file():
+            cfg = Config(str(ini_path))
+            break
+    if cfg is None:
+        cfg = Config()
+        cfg.set_main_option("script_location", str(_ALEMBIC_DIR))
+        cfg.set_main_option("version_path_separator", "os")
+    if database_url:
+        cfg.set_main_option("sqlalchemy.url", database_url)
+    return cfg
 
 
 def run_migrations(database_url: str | None = None) -> None:
-    root = Path(__file__).resolve().parents[2]
-    cfg = Config(str(root / "alembic.ini"))
-    if database_url:
-        cfg.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(cfg, "head")
+    command.upgrade(_alembic_config(database_url), "head")

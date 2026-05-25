@@ -1,6 +1,6 @@
 # scormhost
 
-Turn [FastAPI](https://fastapi.tiangolo.com/) into a **SCORM 1.2 / 2004 hosting app** with user accounts, JWT auth, and an admin UI — deployable to [FastAPI Cloud](https://fastapicloud.com/).
+**Version 0.1.0** — Turn [FastAPI](https://fastapi.tiangolo.com/) into a **SCORM 1.2 / 2004 hosting app** with user accounts, JWT auth, and an admin UI — deployable to [FastAPI Cloud](https://fastapicloud.com/).
 
 Works with packages built by [LXPack](https://github.com/eddiethedean/lxpack) (`lxpack build --target scorm12` / `scorm2004`) and other compliant SCORM ZIPs.
 
@@ -130,10 +130,19 @@ Set `SCORMHOST_DATA_DIR`, `SCORMHOST_SECRET_KEY`, and `SCORMHOST_COOKIE_SECURE=t
 
 ```bash
 pip install -e ".[dev]"
+ruff format .
+ruff check .
+ty check
 pytest
 ```
 
-Tests use `require_auth=False` for SCORM flows and a separate DB for auth tests.
+Tests use `require_auth=False` for SCORM flows and a separate DB for auth tests. Migrations live in `src/scormhost/alembic/` and ship inside the wheel; `alembic upgrade head` from the repo root uses `alembic.ini`.
+
+## Releasing
+
+1. Ensure `pyproject.toml` and [CHANGELOG.md](CHANGELOG.md) match the target version.
+2. Run `pytest`, `ruff check`, `ty check`, and `python -m build`.
+3. Tag `v0.1.0` and publish the GitHub release (attach `dist/*` artifacts if publishing to PyPI manually).
 
 ## Limits (v0.1)
 

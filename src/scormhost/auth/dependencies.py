@@ -100,7 +100,7 @@ def resolve_learning_actor(
     guest_id: str | None,
     request: Request | None = None,
 ) -> Actor:
-    """Taking a course: logged-in users save to their account; guests use browser cookie."""
+    """Course actor: account progress when logged in; guest cookie otherwise."""
     if user is not None:
         can_upload = user.role in (UserRole.instructor, UserRole.admin)
         return Actor(

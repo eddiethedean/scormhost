@@ -67,7 +67,9 @@ def create_scorm_app(
 
     app = FastAPI(
         title=title,
-        description="Public SCORM host with optional accounts for progress and management",
+        description=(
+            "Public SCORM host with optional accounts for progress and management"
+        ),
         version="0.1.0",
         lifespan=_lifespan,
     )

@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 authors = [{ name = "scormhost contributors" }]
 keywords = ["fastapi", "scorm", "lms", "elearning", "scormhost"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 3 - Alpha",
   "Framework :: FastAPI",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: Apache Software License",
@@ -28,7 +28,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx>=0.27.0", "pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
+dev = [
+  "httpx>=0.27.0",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.24.0",
+  "ruff>=0.8.0",
+  "ty>=0.0.30",
+  "build>=1.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/eddiethedean/scormhost"
@@ -49,3 +56,18 @@ entrypoint = "main:app"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/scormhost/templates.py" = ["E501"]
+"src/scormhost/alembic/versions/*.py" = ["I001", "UP035", "UP007"]
+"tests/test_manifest.py" = ["E501"]
+
+[tool.ty]
+environment.python-version = "3.10"

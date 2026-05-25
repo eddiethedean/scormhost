@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from scormhost.db.models import RefreshToken, User  # noqa: F401
 from scormhost.db.session import Base
 

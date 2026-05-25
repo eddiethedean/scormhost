@@ -19,8 +19,8 @@ from scormhost.auth.dependencies import (
     resolve_learning_actor,
 )
 from scormhost.auth.guest import apply_guest_cookie_if_needed
-from scormhost.auth.urls import login_url, safe_next_path
 from scormhost.auth.router import router as auth_router
+from scormhost.auth.urls import login_url, safe_next_path
 from scormhost.config import HostSettings
 from scormhost.db.models import User, UserRole
 from scormhost.manifest import is_scorm_2004_schema

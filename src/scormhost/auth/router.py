@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from starlette.responses import Response as StarletteResponse
 from sqlalchemy.orm import Session
+from starlette.responses import Response as StarletteResponse
 
 from scormhost.auth.cookies import clear_auth_cookies, set_auth_cookies
 from scormhost.auth.dependencies import (
@@ -21,7 +21,6 @@ from scormhost.auth.schemas import (
     TokenResponse,
     UserPublic,
 )
-from scormhost.auth.urls import safe_next_path
 from scormhost.auth.service import (
     admin_update_user,
     authenticate_user,
@@ -35,6 +34,7 @@ from scormhost.auth.service import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
+from scormhost.auth.urls import safe_next_path
 from scormhost.config import HostSettings
 from scormhost.db.models import UserRole
 from scormhost.db.session import get_db
