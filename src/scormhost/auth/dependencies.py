@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from scormhost.auth.guest import ensure_guest_learner_id, valid_guest_learner_id
+from scormhost.auth.guest import ensure_guest_learner_id
 from scormhost.auth.security import decode_access_token
 from scormhost.config import HostSettings
 from scormhost.db.models import User, UserRole

@@ -9,7 +9,10 @@ def test_safe_next_path_rejects_external() -> None:
 
 def test_safe_next_path_allows_local() -> None:
     assert safe_next_path("/launch/abc") == "/launch/abc"
-    assert safe_next_path("/launch/abc?launch=index.html") == "/launch/abc?launch=index.html"
+    assert (
+        safe_next_path("/launch/abc?launch=index.html")
+        == "/launch/abc?launch=index.html"
+    )
 
 
 def test_login_url_includes_next() -> None:

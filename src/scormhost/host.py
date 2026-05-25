@@ -59,8 +59,7 @@ class ScormHost:
                     bootstrap_admin_email=settings.bootstrap_admin_email,
                 )
         elif any(
-            x is not None
-            for x in (title, allow_upload, require_auth, secret_key)
+            x is not None for x in (title, allow_upload, require_auth, secret_key)
         ):
             settings = HostSettings(
                 data_dir=settings.data_dir,

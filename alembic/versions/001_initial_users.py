@@ -27,12 +27,24 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(length=120), nullable=False),
         sa.Column(
             "role",
-            sa.Enum("learner", "instructor", "admin", name="userrole", native_enum=False),
+            sa.Enum(
+                "learner", "instructor", "admin", name="userrole", native_enum=False
+            ),
             nullable=False,
         ),
         sa.Column("is_active", sa.Boolean(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
@@ -46,12 +58,24 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("user_agent", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_refresh_tokens_token_hash"), "refresh_tokens", ["token_hash"], unique=True)
-    op.create_index(op.f("ix_refresh_tokens_user_id"), "refresh_tokens", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_refresh_tokens_token_hash"),
+        "refresh_tokens",
+        ["token_hash"],
+        unique=True,
+    )
+    op.create_index(
+        op.f("ix_refresh_tokens_user_id"), "refresh_tokens", ["user_id"], unique=False
+    )
 
 
 def downgrade() -> None:

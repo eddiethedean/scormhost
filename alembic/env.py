@@ -18,9 +18,10 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return os.environ.get(
-        "SCORMHOST_DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
+    return (
+        os.environ.get("SCORMHOST_DATABASE_URL")
+        or config.get_main_option("sqlalchemy.url")
+        or "sqlite:///./scormhost.db"
     )
 
 

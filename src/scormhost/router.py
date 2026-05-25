@@ -46,9 +46,7 @@ _MAX_CMI_BODY_BYTES = 256 * 1024
 
 def _resolve_launch_href(launch: str, launches: list[dict[str, Any]]) -> str:
     known = {
-        item["href"]
-        for item in launches
-        if is_safe_launch_href(item.get("href", ""))
+        item["href"] for item in launches if is_safe_launch_href(item.get("href", ""))
     }
     if known:
         if launch in known:
@@ -132,7 +130,9 @@ def build_router(settings: HostSettings) -> APIRouter:
         apply_guest_cookie_if_needed(response, request, settings, user)
         return response
 
-    @router.get("/packages/{package_id}", response_class=HTMLResponse, response_model=None)
+    @router.get(
+        "/packages/{package_id}", response_class=HTMLResponse, response_model=None
+    )
     async def package_detail(
         request: Request,
         package_id: str,
@@ -170,7 +170,9 @@ def build_router(settings: HostSettings) -> APIRouter:
         apply_guest_cookie_if_needed(response, request, settings, user)
         return response
 
-    @router.get("/launch/{package_id}", response_class=HTMLResponse, response_model=None)
+    @router.get(
+        "/launch/{package_id}", response_class=HTMLResponse, response_model=None
+    )
     async def launch_package(
         request: Request,
         package_id: str,

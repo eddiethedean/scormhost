@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import Response as StarletteResponse
 from sqlalchemy.orm import Session
 
 from scormhost.auth.cookies import clear_auth_cookies, set_auth_cookies
@@ -86,24 +87,26 @@ async def login_page(
     )
 
 
-@router.get("/register", response_class=HTMLResponse)
+@router.get("/register", response_class=HTMLResponse, response_model=None)
 async def register_page(
     request: Request,
     settings: Annotated[HostSettings, Depends(get_settings)],
-) -> str:
+) -> StarletteResponse:
     url = _url_for(settings)
     if not settings.allow_registration:
         return RedirectResponse(
             f"{url('/login')}?error=registration+disabled",
             status_code=302,
         )
-    return auth_page(
-        title=settings.title,
-        mode="register",
-        allow_registration=True,
-        error=request.query_params.get("error"),
-        next_url=safe_next_path(request.query_params.get("next")),
-        url=url,
+    return HTMLResponse(
+        auth_page(
+            title=settings.title,
+            mode="register",
+            allow_registration=True,
+            error=request.query_params.get("error"),
+            next_url=safe_next_path(request.query_params.get("next")),
+            url=url,
+        ),
     )
 
 
@@ -235,7 +238,7 @@ async def api_update_user(
     user = get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    if user.id == actor.user_id and payload.is_active is False:
+    if user.id == actor.id and payload.is_active is False:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot deactivate yourself")
     if user.role == UserRole.admin:
         admins = count_active_admins(db)
@@ -246,7 +249,11 @@ async def api_update_user(
                 status.HTTP_400_BAD_REQUEST,
                 "Cannot remove or deactivate the last admin",
             )
-    if user.id == actor.id and payload.role is not None and payload.role != UserRole.admin:
+    if (
+        user.id == actor.id
+        and payload.role is not None
+        and payload.role != UserRole.admin
+    ):
         if count_active_admins(db) <= 1:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -269,7 +276,7 @@ async def api_delete_user(
     actor: RequireAdmin,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, bool]:
-    if user_id == actor.user_id:
+    if user_id == actor.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot delete yourself")
     user = get_user_by_id(db, user_id)
     if user is None:

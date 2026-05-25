@@ -28,7 +28,11 @@ class PackageManifest:
 def is_scorm_2004_schema(schema_version: str) -> bool:
     version = schema_version.strip().lower()
     compact = version.replace(" ", "")
-    if compact in ("1.3", "1.3.1") or compact.endswith("1.3") or compact.endswith("1.3.1"):
+    if (
+        compact in ("1.3", "1.3.1")
+        or compact.endswith("1.3")
+        or compact.endswith("1.3.1")
+    ):
         return True
     if "2004" in version:
         return True
@@ -125,9 +129,7 @@ def parse_imsmanifest(manifest_path: Path) -> PackageManifest:
     org_title = "Course"
     launches: list[LaunchItem] = []
 
-    organizations = [
-        e for e in root.iter() if _local_tag(e.tag) == "organization"
-    ]
+    organizations = [e for e in root.iter() if _local_tag(e.tag) == "organization"]
     org = organizations[0] if organizations else None
     if org is not None:
         org_title_elem = _find_first(org, "title")

@@ -58,7 +58,10 @@ def register_user(
     role = UserRole.learner
     if user_count == 0:
         role = UserRole.admin
-    elif settings.bootstrap_admin_email and email == settings.bootstrap_admin_email.lower():
+    elif (
+        settings.bootstrap_admin_email
+        and email == settings.bootstrap_admin_email.lower()
+    ):
         role = UserRole.admin
 
     user = User(

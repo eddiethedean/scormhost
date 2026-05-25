@@ -47,7 +47,9 @@ def apply_guest_cookie_if_needed(
         return
     if valid_guest_learner_id(request, settings):
         return
-    guest_id = getattr(request.state, "scormhost_guest_id", None) or new_guest_learner_id()
+    guest_id = (
+        getattr(request.state, "scormhost_guest_id", None) or new_guest_learner_id()
+    )
     response.set_cookie(
         settings.guest_cookie_name,
         guest_id,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -36,13 +37,13 @@ def app(tmp_path: Path):
 
 
 @pytest.fixture
-def client(app) -> TestClient:
+def client(app) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
 
 
 @pytest.fixture
-def auth_client(tmp_path: Path) -> TestClient:
+def auth_client(tmp_path: Path) -> Iterator[TestClient]:
     """App with SCORMHOST_REQUIRE_AUTH=true (login required to take courses)."""
     db_path = tmp_path / "auth_strict.db"
     application = create_scorm_app(

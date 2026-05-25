@@ -16,6 +16,7 @@ def _u(url: UrlFn | None, path: str) -> str:
         return path
     return url(path)
 
+
 _BASE_CSS = """
     body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
     .wrap { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
@@ -110,9 +111,7 @@ def catalog_page(
             link = f'<a href="{_u(url, f"/launch/{raw_id}")}">Launch</a>'
         delete_cell = ""
         if show_delete and pkg.get("can_delete"):
-            delete_cell = (
-                f' <button class="btn danger" data-delete="{pid}" type="button">Delete</button>'
-            )
+            delete_cell = f' <button class="btn danger" data-delete="{pid}" type="button">Delete</button>'
         rows.append(
             f"<tr><td>{ptitle}</td><td><code>{pid}</code></td>"
             f"<td>{schema}</td><td>{link}{delete_cell}</td></tr>",
@@ -121,8 +120,8 @@ def catalog_page(
     empty_msg = "No courses yet."
     if can_upload:
         empty_msg += " Upload a SCORM ZIP below."
-    table_body = "\n".join(rows) if rows else (
-        f"<tr><td colspan='4'>{empty_msg}</td></tr>"
+    table_body = (
+        "\n".join(rows) if rows else (f"<tr><td colspan='4'>{empty_msg}</td></tr>")
     )
 
     manage_hint = ""
@@ -199,17 +198,22 @@ def package_detail_page(
     url: UrlFn | None = None,
 ) -> str:
     items = []
-    pid_esc = html.escape(package_id)
     for launch in launches:
         label = html.escape(launch.get("title") or launch["href"])
         href_raw = launch["href"]
         href = html.escape(href_raw)
         if is_safe_launch_href(href_raw):
             query = urlencode({"launch": href_raw})
-            launch_url = html.escape(_u(url, f"/launch/{package_id}?{query}"), quote=True)
-            items.append(f'<li><a href="{launch_url}">{label}</a> <code>{href}</code></li>')
+            launch_url = html.escape(
+                _u(url, f"/launch/{package_id}?{query}"), quote=True
+            )
+            items.append(
+                f'<li><a href="{launch_url}">{label}</a> <code>{href}</code></li>'
+            )
         else:
-            items.append(f'<li><span>{label}</span> <code>{href}</code> (invalid launch)</li>')
+            items.append(
+                f"<li><span>{label}</span> <code>{href}</code> (invalid launch)</li>"
+            )
 
     user_nav = f"<p>Signed in as {html.escape(user_label)}</p>" if user_label else ""
     body = f"""
@@ -236,7 +240,9 @@ def launcher_page(
 ) -> str:
     catalog_href = _u(url, "/")
     config_json = json.dumps(scorm_config).replace("<", "\\u003c")
-    global_name = "__SCORMHOST_SCORM2004__" if is_scorm_2004 else "__SCORMHOST_SCORM12__"
+    global_name = (
+        "__SCORMHOST_SCORM2004__" if is_scorm_2004 else "__SCORMHOST_SCORM12__"
+    )
     progress_banner = ""
     if not is_logged_in:
         login_esc = html.escape(login_href, quote=True)

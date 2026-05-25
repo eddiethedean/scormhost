@@ -36,9 +36,12 @@ class HostSettings:
 
     @classmethod
     def from_env(cls, data_dir: Path | None = None) -> HostSettings:
-        base = data_dir or Path(
-            os.environ.get("SCORMHOST_DATA_DIR", "./data"),
-        ).expanduser()
+        base = (
+            data_dir
+            or Path(
+                os.environ.get("SCORMHOST_DATA_DIR", "./data"),
+            ).expanduser()
+        )
         resolved = base.resolve()
         db_default = f"sqlite:///{resolved / 'scormhost.db'}"
         secret = os.environ.get("SCORMHOST_SECRET_KEY") or secrets.token_urlsafe(32)
