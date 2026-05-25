@@ -77,6 +77,8 @@ class PackageStore:
         package_id: str,
         manifest: PackageManifest,
         original_filename: str,
+        *,
+        uploaded_by_id: int | None = None,
     ) -> None:
         self.save_meta(
             package_id,
@@ -84,6 +86,7 @@ class PackageStore:
                 "id": package_id,
                 "original_filename": original_filename,
                 "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "uploaded_by_id": uploaded_by_id,
                 "manifest": {
                     "title": manifest.title,
                     "identifier": manifest.identifier,
@@ -105,6 +108,7 @@ class PackageStore:
         extract_dir: Path,
         original_filename: str,
         preferred_id: str | None = None,
+        uploaded_by_id: int | None = None,
     ) -> str:
         manifest_path = extract_dir / "imsmanifest.xml"
         if not manifest_path.is_file():
@@ -123,7 +127,12 @@ class PackageStore:
         dest = self.package_root(package_id)
         shutil.copytree(extract_dir, dest, dirs_exist_ok=False)
 
-        self.register_package(package_id, parsed, original_filename)
+        self.register_package(
+            package_id,
+            parsed,
+            original_filename,
+            uploaded_by_id=uploaded_by_id,
+        )
         return package_id
 
 

@@ -13,6 +13,7 @@ def extract_scorm_zip(
     zip_bytes: bytes,
     filename: str,
     preferred_id: str | None = None,
+    uploaded_by_id: int | None = None,
 ) -> str:
     if not zip_bytes:
         raise ValueError("Empty upload")
@@ -32,7 +33,21 @@ def extract_scorm_zip(
             zf.extractall(tmp_path / "package")
 
         extract_dir = tmp_path / "package"
-        return store.ingest_extracted(extract_dir, filename, preferred_id)
+        return store.ingest_extracted(
+            extract_dir,
+            filename,
+            preferred_id,
+            uploaded_by_id=uploaded_by_id,
+        )
+
+
+def can_delete_package(meta: dict, actor_user_id: int | None, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    owner = meta.get("uploaded_by_id")
+    if owner is None or actor_user_id is None:
+        return is_admin
+    return int(owner) == actor_user_id
 
 
 def delete_package(store: PackageStore, package_id: str) -> None:

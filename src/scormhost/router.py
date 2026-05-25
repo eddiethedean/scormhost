@@ -1,25 +1,49 @@
 from __future__ import annotations
 
 import zipfile
-from pathlib import Path
-from typing import Any
+from pathlib import Path as PathLib
+from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
+from starlette.responses import Response
 
+from scormhost.auth.dependencies import (
+    CurrentUser,
+    LearningActor,
+    RequireInstructor,
+    get_current_user_optional,
+    get_settings,
+    resolve_learning_actor,
+)
+from scormhost.auth.guest import apply_guest_cookie_if_needed
+from scormhost.auth.urls import login_url, safe_next_path
+from scormhost.auth.router import router as auth_router
 from scormhost.config import HostSettings
-from scormhost.packages import delete_package, extract_scorm_zip
+from scormhost.db.models import User, UserRole
+from scormhost.packages import can_delete_package, delete_package, extract_scorm_zip
 from scormhost.paths import PathTraversalError, safe_content_path
 from scormhost.storage import PackageStore, SessionStore
 from scormhost.templates import catalog_page, launcher_page, package_detail_page
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR = PathLib(__file__).resolve().parent / "static"
 
 
 class CmiPayload(BaseModel):
     elements: dict[str, str] = {}
+
+
+def _request_next_path(request: Request) -> str:
+    path = request.url.path
+    if request.url.query:
+        path = f"{path}?{request.url.query}"
+    return safe_next_path(path)
+
+
+def _redirect_login(request: Request) -> RedirectResponse:
+    return RedirectResponse(url=login_url(_request_next_path(request)), status_code=302)
 
 
 def build_router(settings: HostSettings) -> APIRouter:
@@ -33,17 +57,68 @@ def build_router(settings: HostSettings) -> APIRouter:
             return path
         return f"{prefix}{path}"
 
-    @router.get("/", response_class=HTMLResponse)
-    async def catalog() -> str:
-        records = packages.list_packages()
-        return catalog_page(
-            settings.title,
-            [r.to_dict() for r in records],
-            settings.allow_upload,
+    router.include_router(auth_router)
+
+    @router.get("/", response_class=HTMLResponse, response_model=None)
+    async def catalog(
+        request: Request,
+        settings: Annotated[HostSettings, Depends(get_settings)],
+        user: Annotated[User | None, Depends(get_current_user_optional)],
+    ) -> Response:
+        if settings.require_auth and user is None:
+            return _redirect_login(request)
+        actor = resolve_learning_actor(
+            settings,
+            user,
+            guest_id=request.cookies.get(settings.guest_cookie_name),
         )
 
-    @router.get("/packages/{package_id}", response_class=HTMLResponse)
-    async def package_detail(package_id: str) -> str:
+        records = packages.list_packages()
+        pkg_rows = []
+        for record in records:
+            row = record.to_dict()
+            try:
+                meta = packages.load_meta(record.id)
+                row["can_delete"] = can_delete_package(
+                    meta,
+                    actor.user_id,
+                    actor.can_delete_any_package,
+                )
+            except FileNotFoundError:
+                row["can_delete"] = False
+            pkg_rows.append(row)
+
+        user_label = None
+        if actor.user:
+            user_label = f"{actor.display_name} ({actor.user.role.value})"
+
+        body = catalog_page(
+            settings.title,
+            pkg_rows,
+            user_label=user_label,
+            can_upload=actor.can_upload,
+            show_admin=actor.can_manage_users,
+            show_delete=bool(actor.user),
+            is_logged_in=actor.user is not None,
+        )
+        response = HTMLResponse(body)
+        apply_guest_cookie_if_needed(response, request, settings, user)
+        return response
+
+    @router.get("/packages/{package_id}", response_class=HTMLResponse, response_model=None)
+    async def package_detail(
+        request: Request,
+        package_id: str,
+        settings: Annotated[HostSettings, Depends(get_settings)],
+        user: Annotated[User | None, Depends(get_current_user_optional)],
+    ) -> Response:
+        if settings.require_auth and user is None:
+            return _redirect_login(request)
+        actor = resolve_learning_actor(
+            settings,
+            user,
+            guest_id=request.cookies.get(settings.guest_cookie_name),
+        )
         try:
             meta = packages.load_meta(package_id)
         except FileNotFoundError:
@@ -56,18 +131,33 @@ def build_router(settings: HostSettings) -> APIRouter:
                 url=f"/launch/{package_id}?launch={quote(launch, safe='')}",
                 status_code=302,
             )
-        return package_detail_page(
-            manifest.get("title", package_id),
-            package_id,
-            launches,
+        user_label = actor.display_name if actor.user else None
+        response = HTMLResponse(
+            package_detail_page(
+                manifest.get("title", package_id),
+                package_id,
+                launches,
+                user_label=user_label,
+            ),
         )
+        apply_guest_cookie_if_needed(response, request, settings, user)
+        return response
 
-    @router.get("/launch/{package_id}", response_class=HTMLResponse)
+    @router.get("/launch/{package_id}", response_class=HTMLResponse, response_model=None)
     async def launch_package(
+        request: Request,
         package_id: str,
+        settings: Annotated[HostSettings, Depends(get_settings)],
+        user: Annotated[User | None, Depends(get_current_user_optional)],
         launch: str = Query(default="index.html"),
-        learner_id: str | None = Query(default=None),
-    ) -> str:
+    ) -> Response:
+        if settings.require_auth and user is None:
+            return _redirect_login(request)
+        actor = resolve_learning_actor(
+            settings,
+            user,
+            guest_id=request.cookies.get(settings.guest_cookie_name),
+        )
         try:
             meta = packages.load_meta(package_id)
         except FileNotFoundError:
@@ -80,35 +170,47 @@ def build_router(settings: HostSettings) -> APIRouter:
         if known and launch_href not in known:
             launch_href = launches[0]["href"]
 
-        learner = learner_id or settings.default_learner_id
         is_2004 = "2004" in manifest.get("schema_version", "")
         content_url = url(
             f"/content/{package_id}/{launch_href.lstrip('/')}",
         )
         cmi_url = url(
-            f"/api/scorm/{package_id}/cmi"
-            f"?learner_id={quote(learner)}&launch={quote(launch_href, safe='')}",
+            f"/api/scorm/{package_id}/cmi?launch={quote(launch_href, safe='')}",
         )
         scorm_config: dict[str, Any] = {
-            "learnerId": learner,
-            "learnerName": learner,
+            "learnerId": actor.learner_id,
+            "learnerName": actor.display_name,
             "contentUrl": content_url,
             "cmiUrl": cmi_url,
+            "progressIsAccount": actor.progress_is_account,
         }
         api_script = url(
             "/static/scorm2004-api.js" if is_2004 else "/static/scorm12-api.js",
         )
-        return launcher_page(
-            package_title=manifest.get("title", package_id),
-            package_id=package_id,
-            launch_href=launch_href,
-            is_scorm_2004=is_2004,
-            scorm_config=scorm_config,
-            api_script=api_script,
+        response = HTMLResponse(
+            launcher_page(
+                package_title=manifest.get("title", package_id),
+                package_id=package_id,
+                launch_href=launch_href,
+                is_scorm_2004=is_2004,
+                scorm_config=scorm_config,
+                api_script=api_script,
+                is_logged_in=actor.user is not None,
+                login_href=login_url(_request_next_path(request)),
+            ),
         )
+        apply_guest_cookie_if_needed(response, request, settings, user)
+        return response
 
     @router.get("/content/{package_id}/{rel_path:path}")
-    async def serve_content(package_id: str, rel_path: str) -> FileResponse:
+    async def serve_content(
+        package_id: str,
+        rel_path: str,
+        settings: Annotated[HostSettings, Depends(get_settings)],
+        user: Annotated[User | None, Depends(get_current_user_optional)],
+    ) -> FileResponse:
+        if settings.require_auth and user is None:
+            raise HTTPException(401, "Not authenticated")
         try:
             root = packages.package_root(package_id)
             if not root.is_dir():
@@ -129,17 +231,17 @@ def build_router(settings: HostSettings) -> APIRouter:
 
     @router.get("/api/packages")
     async def list_packages_api() -> JSONResponse:
-        return JSONResponse(
-            [r.to_dict() for r in packages.list_packages()],
-        )
+        return JSONResponse([r.to_dict() for r in packages.list_packages()])
 
     @router.post("/api/packages")
     async def upload_package(
+        user: RequireInstructor,
+        settings: Annotated[HostSettings, Depends(get_settings)],
         file: UploadFile = File(...),
         package_id: str | None = Query(default=None),
     ) -> JSONResponse:
         if not settings.allow_upload:
-            raise HTTPException(403, "Uploads disabled")
+            raise HTTPException(403, "Uploads are disabled on this server")
         if not file.filename or not file.filename.lower().endswith(".zip"):
             raise HTTPException(400, "Upload must be a .zip file")
 
@@ -153,6 +255,7 @@ def build_router(settings: HostSettings) -> APIRouter:
                 body,
                 file.filename,
                 preferred_id=package_id,
+                uploaded_by_id=user.id,
             )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
@@ -170,28 +273,45 @@ def build_router(settings: HostSettings) -> APIRouter:
         )
 
     @router.delete("/api/packages/{package_id}")
-    async def remove_package(package_id: str) -> JSONResponse:
+    async def remove_package(
+        package_id: str,
+        user: CurrentUser,
+    ) -> JSONResponse:
         try:
-            packages.load_meta(package_id)
+            meta = packages.load_meta(package_id)
         except FileNotFoundError:
             raise HTTPException(404, "Package not found") from None
+        is_admin = user.role == UserRole.admin
+        if not can_delete_package(meta, user.id, is_admin):
+            raise HTTPException(403, "Cannot delete this package")
         delete_package(packages, package_id)
         return JSONResponse({"deleted": package_id})
 
     @router.get("/api/scorm/{package_id}/cmi")
     async def get_cmi(
+        request: Request,
         package_id: str,
-        learner_id: str = Query(...),
+        actor: LearningActor,
+        settings: Annotated[HostSettings, Depends(get_settings)],
         launch: str = Query(default="index.html"),
     ) -> JSONResponse:
-        elements = sessions.load_cmi(package_id, learner_id, launch)
-        return JSONResponse({"elements": elements})
+        elements = sessions.load_cmi(package_id, actor.learner_id, launch)
+        response = JSONResponse({"elements": elements})
+        apply_guest_cookie_if_needed(
+            response,
+            request,
+            settings,
+            actor.user,
+        )
+        return response
 
     @router.put("/api/scorm/{package_id}/cmi")
     async def put_cmi(
+        request: Request,
         package_id: str,
         payload: CmiPayload,
-        learner_id: str = Query(...),
+        actor: LearningActor,
+        settings: Annotated[HostSettings, Depends(get_settings)],
         launch: str = Query(default="index.html"),
     ) -> JSONResponse:
         try:
@@ -200,11 +320,18 @@ def build_router(settings: HostSettings) -> APIRouter:
             raise HTTPException(404, "Package not found") from None
         sessions.save_cmi(
             package_id,
-            learner_id,
+            actor.learner_id,
             launch,
             payload.elements,
         )
-        return JSONResponse({"ok": True})
+        response = JSONResponse({"ok": True})
+        apply_guest_cookie_if_needed(
+            response,
+            request,
+            settings,
+            actor.user,
+        )
+        return response
 
     @router.get("/health")
     async def health() -> dict[str, str]:

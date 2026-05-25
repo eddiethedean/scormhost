@@ -1,13 +1,4 @@
-import pytest
 from fastapi.testclient import TestClient
-
-from scormhost import create_scorm_app
-
-
-@pytest.fixture
-def client(tmp_path) -> TestClient:
-    app = create_scorm_app(data_dir=tmp_path / "data", title="Test Host")
-    return TestClient(app)
 
 
 def test_health(client: TestClient) -> None:
@@ -18,6 +9,15 @@ def test_upload_launch_and_cmi(
     client: TestClient,
     minimal_scorm_zip: bytes,
 ) -> None:
+    client.post(
+        "/api/auth/register",
+        json={
+            "email": "uploader@example.com",
+            "username": "uploader",
+            "password": "password123",
+            "display_name": "Uploader",
+        },
+    )
     response = client.post(
         "/api/packages",
         files={
@@ -38,13 +38,13 @@ def test_upload_launch_and_cmi(
 
     cmi_put = client.put(
         f"/api/scorm/{package_id}/cmi",
-        params={"learner_id": "alice", "launch": "index.html"},
+        params={"launch": "index.html"},
         json={"elements": {"cmi.core.lesson_status": "incomplete"}},
     )
     assert cmi_put.status_code == 200
 
     cmi_get = client.get(
         f"/api/scorm/{package_id}/cmi",
-        params={"learner_id": "alice", "launch": "index.html"},
+        params={"launch": "index.html"},
     )
     assert cmi_get.json()["elements"]["cmi.core.lesson_status"] == "incomplete"
