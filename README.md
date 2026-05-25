@@ -90,6 +90,7 @@ HTML: `/login`, `/register`, `/admin/users`
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` | Package catalog (requires login when auth enabled) |
+| `GET` | `/api/packages` | Package list JSON (public; no auth required) |
 | `GET` | `/launch/{package_id}` | SCORM player |
 | `GET` | `/content/{package_id}/{path}` | Package static files |
 | `POST` | `/api/packages` | Upload ZIP (instructor/admin) |
@@ -105,7 +106,8 @@ HTML: `/login`, `/register`, `/admin/users`
 | `SCORMHOST_DATABASE_URL` | `sqlite:///<data>/scormhost.db` | SQLAlchemy URL |
 | `SCORMHOST_REQUIRE_AUTH` | `false` | If `true`, login required to take courses (not just manage) |
 | `SCORMHOST_ALLOW_REGISTRATION` | `true` | Public sign-up |
-| `SCORMHOST_BOOTSTRAP_ADMIN_EMAIL` | — | Force admin role for matching email on register |
+| `SCORMHOST_BOOTSTRAP_ADMIN_EMAIL` | — | Force admin role for matching email on register (only use with trusted registration; no email verification) |
+| `SCORMHOST_API_PREFIX` | `` | URL prefix for all routes (e.g. `/scorm` behind a reverse proxy) |
 | `SCORMHOST_ACCESS_TOKEN_MINUTES` | `30` | JWT access TTL |
 | `SCORMHOST_REFRESH_TOKEN_DAYS` | `7` | Refresh token TTL |
 | `SCORMHOST_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
@@ -122,7 +124,7 @@ fastapi login
 fastapi deploy
 ```
 
-Set `SCORMHOST_DATA_DIR`, `SCORMHOST_SECRET_KEY`, and `SCORMHOST_COOKIE_SECURE=true` in the dashboard.
+Set `SCORMHOST_DATA_DIR`, `SCORMHOST_SECRET_KEY`, and `SCORMHOST_COOKIE_SECURE=true` in the dashboard. Always set a stable `SCORMHOST_SECRET_KEY` in production (do not rely on the random per-start default).
 
 ## Development
 

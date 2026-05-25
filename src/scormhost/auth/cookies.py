@@ -35,5 +35,10 @@ def set_auth_cookies(
 
 
 def clear_auth_cookies(response: Response, settings: HostSettings) -> None:
-    response.delete_cookie(settings.access_cookie_name, path="/")
-    response.delete_cookie(settings.refresh_cookie_name, path="/")
+    common = {
+        "path": "/",
+        "secure": settings.cookie_secure,
+        "samesite": "lax",
+    }
+    response.delete_cookie(settings.access_cookie_name, **common)
+    response.delete_cookie(settings.refresh_cookie_name, **common)

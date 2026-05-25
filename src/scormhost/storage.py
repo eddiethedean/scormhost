@@ -10,6 +10,12 @@ from typing import Any
 
 from scormhost.config import HostSettings
 from scormhost.manifest import PackageManifest, parse_imsmanifest, slugify_package_id
+from scormhost.paths import (
+    InvalidPackageIdError,
+    package_root_under,
+    session_dir_under,
+    validate_package_id,
+)
 
 
 @dataclass
@@ -31,10 +37,10 @@ class PackageStore:
         self.settings.sessions_dir.mkdir(parents=True, exist_ok=True)
 
     def package_root(self, package_id: str) -> Path:
-        safe = re.sub(r"[^a-zA-Z0-9._-]+", "", package_id)
-        if not safe or safe != package_id:
-            raise ValueError("Invalid package id")
-        return self.settings.packages_dir / safe
+        try:
+            return package_root_under(self.settings.packages_dir, package_id)
+        except InvalidPackageIdError as exc:
+            raise ValueError(str(exc)) from exc
 
     def meta_path(self, package_id: str) -> Path:
         return self.package_root(package_id) / ".scormhost.json"
@@ -115,6 +121,11 @@ class PackageStore:
             raise ValueError("Package must contain imsmanifest.xml")
 
         parsed = parse_imsmanifest(manifest_path)
+        if preferred_id is not None:
+            try:
+                validate_package_id(preferred_id)
+            except InvalidPackageIdError as exc:
+                raise ValueError(str(exc)) from exc
         base_id = preferred_id or slugify_package_id(
             Path(original_filename).stem or parsed.title,
         )
@@ -147,10 +158,13 @@ class SessionStore:
         learner_id: str,
         launch_href: str,
     ) -> Path:
+        try:
+            folder = session_dir_under(self.settings.sessions_dir, package_id)
+        except InvalidPackageIdError as exc:
+            raise ValueError(str(exc)) from exc
+        folder.mkdir(parents=True, exist_ok=True)
         safe_learner = re.sub(r"[^a-zA-Z0-9._@-]+", "_", learner_id)[:128]
         safe_launch = re.sub(r"[^a-zA-Z0-9._/-]+", "_", launch_href)[:200]
-        folder = self.settings.sessions_dir / package_id
-        folder.mkdir(parents=True, exist_ok=True)
         name = f"{safe_learner}__{safe_launch.replace('/', '_')}.json"
         return folder / name
 

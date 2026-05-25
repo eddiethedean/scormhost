@@ -111,6 +111,28 @@ def issue_tokens(
     return access, raw_refresh
 
 
+def count_active_admins(db: Session) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.admin, User.is_active.is_(True)),
+        )
+        or 0,
+    )
+
+
+def revoke_all_refresh_tokens(db: Session, user_id: int) -> None:
+    now = datetime.now(timezone.utc)
+    for record in db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+        ),
+    ):
+        record.revoked_at = now
+
+
 def rotate_refresh_token(
     db: Session,
     settings: HostSettings,
@@ -120,9 +142,15 @@ def rotate_refresh_token(
 ) -> tuple[User, str, str]:
     token_hash = hash_refresh_token(raw_token)
     record = db.scalar(
-        select(RefreshToken).where(RefreshToken.token_hash == token_hash),
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == token_hash)
+        .with_for_update(),
     )
-    if record is None or record.revoked_at is not None:
+    if record is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    if record.revoked_at is not None:
+        revoke_all_refresh_tokens(db, record.user_id)
+        db.flush()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
 
     now = datetime.now(timezone.utc)
@@ -158,6 +186,7 @@ def change_password(
     if not verify_password(current_password, user.hashed_password):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is wrong")
     user.hashed_password = hash_password(new_password)
+    revoke_all_refresh_tokens(db, user.id)
 
 
 def admin_update_user(

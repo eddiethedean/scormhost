@@ -22,7 +22,17 @@ class PackageManifest:
 
     @property
     def is_scorm_2004(self) -> bool:
-        return "2004" in self.schema_version
+        return is_scorm_2004_schema(self.schema_version)
+
+
+def is_scorm_2004_schema(schema_version: str) -> bool:
+    version = schema_version.strip().lower()
+    compact = version.replace(" ", "")
+    if compact in ("1.3", "1.3.1") or compact.endswith("1.3") or compact.endswith("1.3.1"):
+        return True
+    if "2004" in version:
+        return True
+    return False
 
     @property
     def primary_launch(self) -> LaunchItem | None:
@@ -52,8 +62,35 @@ def _find_first(parent: ET.Element, local_name: str) -> ET.Element | None:
     return None
 
 
+def _collect_launch_items(
+    parent: ET.Element,
+    resources: dict[str, str],
+    resource_titles: dict[str, str],
+    launches: list[LaunchItem],
+) -> None:
+    for item in _find_children(parent, "item"):
+        item_id = item.attrib.get("identifier", "")
+        title_elem = _find_first(item, "title")
+        item_title = _text(title_elem) if title_elem is not None else item_id
+        ref = item.attrib.get("identifierref")
+        if ref and ref in resources:
+            launches.append(
+                LaunchItem(
+                    identifier=item_id or ref,
+                    title=item_title or ref,
+                    href=resources[ref],
+                ),
+            )
+        _collect_launch_items(item, resources, resource_titles, launches)
+
+
 def parse_imsmanifest(manifest_path: Path) -> PackageManifest:
-    tree = ET.parse(manifest_path)
+    try:
+        from defusedxml import ElementTree as SafeET
+
+        tree = SafeET.parse(manifest_path)
+    except ImportError:
+        tree = ET.parse(manifest_path)
     root = tree.getroot()
 
     schema_version = "1.2"
@@ -61,6 +98,14 @@ def parse_imsmanifest(manifest_path: Path) -> PackageManifest:
         if _local_tag(elem.tag) == "schemaversion" and elem.text:
             schema_version = elem.text.strip()
             break
+    if is_scorm_2004_schema(schema_version):
+        pass
+    elif any("2004" in _local_tag(elem.tag).lower() for elem in root.iter()):
+        for elem in root.iter():
+            tag = _local_tag(elem.tag).lower()
+            if "adl" in tag or "2004" in tag:
+                schema_version = "CAM 1.3"
+                break
 
     identifier = root.attrib.get("identifier", "course")
 
@@ -89,19 +134,7 @@ def parse_imsmanifest(manifest_path: Path) -> PackageManifest:
         if org_title_elem is not None:
             org_title = _text(org_title_elem) or org_title
 
-        for item in _find_children(org, "item"):
-            item_id = item.attrib.get("identifier", "")
-            title_elem = _find_first(item, "title")
-            item_title = _text(title_elem) if title_elem is not None else item_id
-            ref = item.attrib.get("identifierref")
-            if ref and ref in resources:
-                launches.append(
-                    LaunchItem(
-                        identifier=item_id or ref,
-                        title=item_title or ref,
-                        href=resources[ref],
-                    ),
-                )
+        _collect_launch_items(org, resources, resource_titles, launches)
 
     if not launches:
         for rid, href in resources.items():
@@ -129,4 +162,7 @@ def parse_imsmanifest(manifest_path: Path) -> PackageManifest:
 
 def slugify_package_id(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return slug or "package"
+    slug = slug or "package"
+    if slug in (".", "..") or not re.match(r"^[a-zA-Z0-9]", slug):
+        slug = f"pkg-{slug.lstrip('-')}" if slug else "package"
+    return slug

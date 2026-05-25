@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+
+from scormhost import create_scorm_app
 
 
 def test_health(client: TestClient) -> None:
@@ -48,3 +52,36 @@ def test_upload_launch_and_cmi(
         params={"launch": "index.html"},
     )
     assert cmi_get.json()["elements"]["cmi.core.lesson_status"] == "incomplete"
+
+
+def test_api_prefix_in_launch_page(
+    tmp_path: Path,
+    minimal_scorm_zip: bytes,
+) -> None:
+    db_path = tmp_path / "prefix.db"
+    application = create_scorm_app(
+        data_dir=tmp_path / "data_prefix",
+        secret_key="test-secret-key-for-jwt-signing-only",
+        database_url=f"sqlite:///{db_path}",
+        api_prefix="/scorm",
+    )
+    with TestClient(application) as prefixed:
+        prefixed.post(
+            "/api/auth/register",
+            json={
+                "email": "pfx@example.com",
+                "username": "pfxuser",
+                "password": "password123",
+                "display_name": "Prefix",
+            },
+        )
+        upload = prefixed.post(
+            "/api/packages",
+            files={"file": ("demo.zip", minimal_scorm_zip, "application/zip")},
+        )
+        assert upload.status_code == 201
+        package_id = upload.json()["id"]
+        launch = prefixed.get(f"/launch/{package_id}")
+        assert launch.status_code == 200
+        assert "/scorm/api/scorm/" in launch.text
+        assert "/scorm/static/scorm12-api.js" in launch.text

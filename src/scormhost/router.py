@@ -23,8 +23,14 @@ from scormhost.auth.urls import login_url, safe_next_path
 from scormhost.auth.router import router as auth_router
 from scormhost.config import HostSettings
 from scormhost.db.models import User, UserRole
+from scormhost.manifest import is_scorm_2004_schema
 from scormhost.packages import can_delete_package, delete_package, extract_scorm_zip
-from scormhost.paths import PathTraversalError, safe_content_path
+from scormhost.paths import (
+    InvalidPackageIdError,
+    PathTraversalError,
+    is_safe_launch_href,
+    safe_content_path,
+)
 from scormhost.storage import PackageStore, SessionStore
 from scormhost.templates import catalog_page, launcher_page, package_detail_page
 
@@ -35,15 +41,33 @@ class CmiPayload(BaseModel):
     elements: dict[str, str] = {}
 
 
+_MAX_CMI_BODY_BYTES = 256 * 1024
+
+
+def _resolve_launch_href(launch: str, launches: list[dict[str, Any]]) -> str:
+    known = {
+        item["href"]
+        for item in launches
+        if is_safe_launch_href(item.get("href", ""))
+    }
+    if known:
+        if launch in known:
+            return launch
+        return launches[0]["href"]
+    if launches:
+        first = launches[0]["href"]
+        if is_safe_launch_href(first):
+            return first
+    if is_safe_launch_href(launch):
+        return launch
+    return "index.html"
+
+
 def _request_next_path(request: Request) -> str:
     path = request.url.path
     if request.url.query:
         path = f"{path}?{request.url.query}"
     return safe_next_path(path)
-
-
-def _redirect_login(request: Request) -> RedirectResponse:
-    return RedirectResponse(url=login_url(_request_next_path(request)), status_code=302)
 
 
 def build_router(settings: HostSettings) -> APIRouter:
@@ -57,6 +81,12 @@ def build_router(settings: HostSettings) -> APIRouter:
             return path
         return f"{prefix}{path}"
 
+    def _redirect_login(request: Request) -> RedirectResponse:
+        return RedirectResponse(
+            url=login_url(_request_next_path(request), url=url),
+            status_code=302,
+        )
+
     router.include_router(auth_router)
 
     @router.get("/", response_class=HTMLResponse, response_model=None)
@@ -67,11 +97,7 @@ def build_router(settings: HostSettings) -> APIRouter:
     ) -> Response:
         if settings.require_auth and user is None:
             return _redirect_login(request)
-        actor = resolve_learning_actor(
-            settings,
-            user,
-            guest_id=request.cookies.get(settings.guest_cookie_name),
-        )
+        actor = resolve_learning_actor(settings, user, guest_id=None, request=request)
 
         records = packages.list_packages()
         pkg_rows = []
@@ -100,6 +126,7 @@ def build_router(settings: HostSettings) -> APIRouter:
             show_admin=actor.can_manage_users,
             show_delete=bool(actor.user),
             is_logged_in=actor.user is not None,
+            url=url,
         )
         response = HTMLResponse(body)
         apply_guest_cookie_if_needed(response, request, settings, user)
@@ -114,21 +141,20 @@ def build_router(settings: HostSettings) -> APIRouter:
     ) -> Response:
         if settings.require_auth and user is None:
             return _redirect_login(request)
-        actor = resolve_learning_actor(
-            settings,
-            user,
-            guest_id=request.cookies.get(settings.guest_cookie_name),
-        )
+        actor = resolve_learning_actor(settings, user, guest_id=None, request=request)
         try:
             meta = packages.load_meta(package_id)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             raise HTTPException(404, "Package not found") from None
         manifest = meta["manifest"]
         launches = manifest.get("launches", [])
         if len(launches) <= 1:
             launch = launches[0]["href"] if launches else "index.html"
+            launch = _resolve_launch_href(launch, launches)
             return RedirectResponse(
-                url=f"/launch/{package_id}?launch={quote(launch, safe='')}",
+                url=url(
+                    f"/launch/{package_id}?launch={quote(launch, safe='')}",
+                ),
                 status_code=302,
             )
         user_label = actor.display_name if actor.user else None
@@ -138,6 +164,7 @@ def build_router(settings: HostSettings) -> APIRouter:
                 package_id,
                 launches,
                 user_label=user_label,
+                url=url,
             ),
         )
         apply_guest_cookie_if_needed(response, request, settings, user)
@@ -153,24 +180,19 @@ def build_router(settings: HostSettings) -> APIRouter:
     ) -> Response:
         if settings.require_auth and user is None:
             return _redirect_login(request)
-        actor = resolve_learning_actor(
-            settings,
-            user,
-            guest_id=request.cookies.get(settings.guest_cookie_name),
-        )
+        actor = resolve_learning_actor(settings, user, guest_id=None, request=request)
         try:
             meta = packages.load_meta(package_id)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             raise HTTPException(404, "Package not found") from None
 
         manifest = meta["manifest"]
         launches = manifest.get("launches", [])
-        launch_href = launch
-        known = {item["href"] for item in launches}
-        if known and launch_href not in known:
-            launch_href = launches[0]["href"]
+        launch_href = _resolve_launch_href(launch, launches)
+        if not is_safe_launch_href(launch_href):
+            raise HTTPException(400, "Invalid launch path")
 
-        is_2004 = "2004" in manifest.get("schema_version", "")
+        is_2004 = is_scorm_2004_schema(manifest.get("schema_version", ""))
         content_url = url(
             f"/content/{package_id}/{launch_href.lstrip('/')}",
         )
@@ -196,7 +218,8 @@ def build_router(settings: HostSettings) -> APIRouter:
                 scorm_config=scorm_config,
                 api_script=api_script,
                 is_logged_in=actor.user is not None,
-                login_href=login_url(_request_next_path(request)),
+                login_href=login_url(_request_next_path(request), url=url),
+                url=url,
             ),
         )
         apply_guest_cookie_if_needed(response, request, settings, user)
@@ -257,7 +280,7 @@ def build_router(settings: HostSettings) -> APIRouter:
                 preferred_id=package_id,
                 uploaded_by_id=user.id,
             )
-        except ValueError as exc:
+        except (ValueError, InvalidPackageIdError) as exc:
             raise HTTPException(400, str(exc)) from exc
         except zipfile.BadZipFile as exc:
             raise HTTPException(400, "Invalid zip file") from exc
@@ -279,7 +302,7 @@ def build_router(settings: HostSettings) -> APIRouter:
     ) -> JSONResponse:
         try:
             meta = packages.load_meta(package_id)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             raise HTTPException(404, "Package not found") from None
         is_admin = user.role == UserRole.admin
         if not can_delete_package(meta, user.id, is_admin):
@@ -295,7 +318,14 @@ def build_router(settings: HostSettings) -> APIRouter:
         settings: Annotated[HostSettings, Depends(get_settings)],
         launch: str = Query(default="index.html"),
     ) -> JSONResponse:
-        elements = sessions.load_cmi(package_id, actor.learner_id, launch)
+        try:
+            packages.load_meta(package_id)
+        except (FileNotFoundError, ValueError):
+            raise HTTPException(404, "Package not found") from None
+        try:
+            elements = sessions.load_cmi(package_id, actor.learner_id, launch)
+        except ValueError:
+            raise HTTPException(404, "Package not found") from None
         response = JSONResponse({"elements": elements})
         apply_guest_cookie_if_needed(
             response,
@@ -314,16 +344,33 @@ def build_router(settings: HostSettings) -> APIRouter:
         settings: Annotated[HostSettings, Depends(get_settings)],
         launch: str = Query(default="index.html"),
     ) -> JSONResponse:
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > _MAX_CMI_BODY_BYTES:
+                    raise HTTPException(413, "CMI payload too large")
+            except ValueError:
+                pass
+        if not payload.elements:
+            raise HTTPException(400, "elements must not be empty")
         try:
             packages.load_meta(package_id)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             raise HTTPException(404, "Package not found") from None
-        sessions.save_cmi(
-            package_id,
-            actor.learner_id,
-            launch,
-            payload.elements,
-        )
+        try:
+            existing = sessions.load_cmi(package_id, actor.learner_id, launch)
+        except ValueError:
+            raise HTTPException(404, "Package not found") from None
+        merged = {**existing, **payload.elements}
+        try:
+            sessions.save_cmi(
+                package_id,
+                actor.learner_id,
+                launch,
+                merged,
+            )
+        except ValueError:
+            raise HTTPException(404, "Package not found") from None
         response = JSONResponse({"ok": True})
         apply_guest_cookie_if_needed(
             response,

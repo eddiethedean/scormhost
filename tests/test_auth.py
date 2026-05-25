@@ -89,6 +89,49 @@ def test_login_page_preserves_next(client: TestClient) -> None:
     assert "/launch/demo-id" in page.text
 
 
+def test_login_password_max_length(auth_client: TestClient) -> None:
+    auth_client.post(
+        "/api/auth/register",
+        json={
+            "email": "longpw@example.com",
+            "username": "longpwuser",
+            "password": "password123",
+            "display_name": "Long PW",
+        },
+    )
+    auth_client.cookies.clear()
+    response = auth_client.post(
+        "/api/auth/login",
+        json={"email": "longpw@example.com", "password": "x" * 200},
+    )
+    assert response.status_code == 422
+
+
+def test_password_change_revokes_refresh(auth_client: TestClient) -> None:
+    auth_client.post(
+        "/api/auth/register",
+        json={
+            "email": "revoke@example.com",
+            "username": "revokeuser",
+            "password": "password123",
+            "display_name": "Revoke Test",
+        },
+    )
+    refresh_cookie = auth_client.cookies.get("scormhost_refresh_token")
+    assert refresh_cookie
+
+    auth_client.patch(
+        "/api/auth/me/password",
+        json={
+            "current_password": "password123",
+            "new_password": "newpassword123",
+        },
+    )
+    auth_client.cookies.set("scormhost_refresh_token", refresh_cookie)
+    refresh = auth_client.post("/api/auth/refresh")
+    assert refresh.status_code == 401
+
+
 def test_strict_auth_redirect_includes_next(auth_client: TestClient) -> None:
     response = auth_client.get("/launch/missing", follow_redirects=False)
     assert response.status_code == 302

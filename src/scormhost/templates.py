@@ -2,8 +2,19 @@ from __future__ import annotations
 
 import html
 import json
+from collections.abc import Callable
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
+
+from scormhost.paths import is_safe_launch_href
+
+UrlFn = Callable[[str], str]
+
+
+def _u(url: UrlFn | None, path: str) -> str:
+    if url is None:
+        return path
+    return url(path)
 
 _BASE_CSS = """
     body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
@@ -46,24 +57,25 @@ def nav_bar(
     title: str,
     user_label: str | None,
     show_admin: bool,
+    url: UrlFn | None = None,
 ) -> str:
     links = []
     if user_label:
         links.append(f"<span>{html.escape(user_label)}</span>")
         links.append('<a href="#" id="logout-link">Log out</a>')
     else:
-        links.append('<a href="/login">Log in</a>')
-        links.append('<a href="/register">Register</a>')
+        links.append(f'<a href="{_u(url, "/login")}">Log in</a>')
+        links.append(f'<a href="{_u(url, "/register")}">Register</a>')
     if show_admin:
-        links.append('<a href="/admin/users">Users</a>')
+        links.append(f'<a href="{_u(url, "/admin/users")}">Users</a>')
     nav = "\n".join(links)
-    logout_js = """
+    logout_js = f"""
 <script>
-document.getElementById('logout-link')?.addEventListener('click', async (e) => {
+document.getElementById('logout-link')?.addEventListener('click', async (e) => {{
   e.preventDefault();
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-  location.href = '/login';
-});
+  await fetch('{_u(url, "/api/auth/logout")}', {{ method: 'POST', credentials: 'same-origin' }});
+  location.href = '{_u(url, "/login")}';
+}});
 </script>"""
     return f"""<header>
   <h1>{html.escape(title)}</h1>
@@ -80,17 +92,22 @@ def catalog_page(
     show_admin: bool,
     show_delete: bool,
     is_logged_in: bool,
+    url: UrlFn | None = None,
 ) -> str:
     rows = []
     for pkg in packages:
-        pid = html.escape(pkg["id"])
+        raw_id = pkg["id"]
+        pid = html.escape(raw_id)
         ptitle = html.escape(pkg["title"])
         schema = html.escape(pkg.get("schema_version", "1.2"))
         launch_count = pkg.get("launch_count", 1)
         if launch_count > 1:
-            link = f'<a href="/packages/{pid}">Open ({launch_count} activities)</a>'
+            link = (
+                f'<a href="{_u(url, f"/packages/{raw_id}")}">'
+                f"Open ({launch_count} activities)</a>"
+            )
         else:
-            link = f'<a href="/launch/{pid}">Launch</a>'
+            link = f'<a href="{_u(url, f"/launch/{raw_id}")}">Launch</a>'
         delete_cell = ""
         if show_delete and pkg.get("can_delete"):
             delete_cell = (
@@ -110,10 +127,10 @@ def catalog_page(
 
     manage_hint = ""
     if not is_logged_in:
-        manage_hint = """
+        manage_hint = f"""
   <p class="card" style="background:#eff6ff;border-color:#bfdbfe;">
     <strong>Anyone can launch courses</strong> without an account. Progress is saved in this browser automatically.
-    <a href="/login">Log in</a> or <a href="/register">register</a> to tie progress to your account, or to upload and manage courses (instructor/admin).
+    <a href="{_u(url, "/login")}">Log in</a> or <a href="{_u(url, "/register")}">register</a> to tie progress to your account, or to upload and manage courses (instructor/admin).
   </p>"""
     elif not can_upload:
         manage_hint = """
@@ -121,7 +138,7 @@ def catalog_page(
 
     upload_block = ""
     if can_upload:
-        upload_block = """
+        upload_block = f"""
   <section class="card upload">
     <h2>Upload SCORM package</h2>
     <p>Instructors and admins: upload SCORM 1.2 or 2004 ZIP files here.</p>
@@ -132,37 +149,37 @@ def catalog_page(
     <p id="upload-status"></p>
   </section>
 <script>
-document.getElementById('upload-form')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
+document.getElementById('upload-form')?.addEventListener('submit', async (ev) => {{
+  ev.preventDefault();
   const status = document.getElementById('upload-status');
-  const file = e.target.querySelector('input[type=file]').files[0];
+  const file = ev.target.querySelector('input[type=file]').files[0];
   if (!file) return;
   const fd = new FormData();
   fd.append('file', file);
   status.textContent = 'Uploading…';
-  const res = await fetch('/api/packages', { method: 'POST', body: fd, credentials: 'same-origin' });
-  if (res.status === 401) {
-    location.href = '/login?next=' + encodeURIComponent(location.pathname);
+  const res = await fetch('{_u(url, "/api/packages")}', {{ method: 'POST', body: fd, credentials: 'same-origin' }});
+  if (res.status === 401) {{
+    location.href = '{_u(url, "/login")}?next=' + encodeURIComponent(location.pathname);
     return;
-  }
-  if (res.ok) { location.reload(); return; }
-  const err = await res.json().catch(() => ({}));
+  }}
+  if (res.ok) {{ location.reload(); return; }}
+  const err = await res.json().catch(() => ({{}}));
   status.textContent = err.detail || 'Upload failed (instructor or admin required)';
   status.style.color = '#dc2626';
-});
-document.querySelectorAll('[data-delete]').forEach((btn) => {
-  btn.addEventListener('click', async () => {
+}});
+document.querySelectorAll('[data-delete]').forEach((btn) => {{
+  btn.addEventListener('click', async () => {{
     if (!confirm('Delete this package?')) return;
     const id = btn.getAttribute('data-delete');
-    const res = await fetch('/api/packages/' + id, { method: 'DELETE', credentials: 'same-origin' });
+    const res = await fetch('{_u(url, "/api/packages")}/' + id, {{ method: 'DELETE', credentials: 'same-origin' }});
     if (res.ok) location.reload();
     else alert('Delete failed');
-  });
-});
+  }});
+}});
 </script>"""
 
     body = f"""
-{nav_bar(title=title, user_label=user_label, show_admin=show_admin)}
+{nav_bar(title=title, user_label=user_label, show_admin=show_admin, url=url)}
   {manage_hint}
   <table>
     <thead><tr><th>Title</th><th>Id</th><th>Schema</th><th>Actions</th></tr></thead>
@@ -179,17 +196,24 @@ def package_detail_page(
     launches: list[dict[str, str]],
     *,
     user_label: str | None,
+    url: UrlFn | None = None,
 ) -> str:
     items = []
+    pid_esc = html.escape(package_id)
     for launch in launches:
         label = html.escape(launch.get("title") or launch["href"])
-        href = html.escape(launch["href"])
-        url = f"/launch/{html.escape(package_id)}?launch={html.escape(launch['href'])}"
-        items.append(f'<li><a href="{url}">{label}</a> <code>{href}</code></li>')
+        href_raw = launch["href"]
+        href = html.escape(href_raw)
+        if is_safe_launch_href(href_raw):
+            query = urlencode({"launch": href_raw})
+            launch_url = html.escape(_u(url, f"/launch/{package_id}?{query}"), quote=True)
+            items.append(f'<li><a href="{launch_url}">{label}</a> <code>{href}</code></li>')
+        else:
+            items.append(f'<li><span>{label}</span> <code>{href}</code> (invalid launch)</li>')
 
     user_nav = f"<p>Signed in as {html.escape(user_label)}</p>" if user_label else ""
     body = f"""
-<p><a href="/">← Catalog</a></p>
+<p><a href="{_u(url, "/")}">← Catalog</a></p>
 {user_nav}
 <h2>{html.escape(title)}</h2>
 <p>Package <code>{html.escape(package_id)}</code> — choose an activity:</p>
@@ -208,7 +232,9 @@ def launcher_page(
     api_script: str,
     is_logged_in: bool,
     login_href: str = "/login",
+    url: UrlFn | None = None,
 ) -> str:
+    catalog_href = _u(url, "/")
     config_json = json.dumps(scorm_config).replace("<", "\\u003c")
     global_name = "__SCORMHOST_SCORM2004__" if is_scorm_2004 else "__SCORMHOST_SCORM12__"
     progress_banner = ""
@@ -217,7 +243,7 @@ def launcher_page(
         progress_banner = f"""
   <div id="progress-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;color:#f8fafc;padding:0.4rem 1rem;font:14px system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;">
     <span>Progress saved in this browser. <a href="{login_esc}" style="color:#93c5fd">Log in</a> to save to your account.</span>
-    <a href="/" style="color:#93c5fd">Catalog</a>
+    <a href="{html.escape(catalog_href, quote=True)}" style="color:#93c5fd">Catalog</a>
   </div>
   <style>iframe {{ margin-top: 2.25rem; height: calc(100vh - 2.25rem) !important; }}</style>"""
     return f"""<!DOCTYPE html>
@@ -246,6 +272,7 @@ def auth_page(
     allow_registration: bool,
     error: str | None,
     next_url: str = "/",
+    url: UrlFn | None = None,
 ) -> str:
     err = f'<p class="error">{html.escape(error)}</p>' if error else ""
     next_q = ""
@@ -264,9 +291,9 @@ def auth_page(
         if allow_registration:
             extra = (
                 f'<p style="margin-top:1rem">No account? '
-                f'<a href="/register{next_q}">Register</a></p>'
+                f'<a href="{_u(url, f"/register{next_q}")}">Register</a></p>'
             )
-        endpoint = "/api/auth/login"
+        endpoint = _u(url, "/api/auth/login")
     else:
         subtitle = "<p>Create an account to save progress across devices. The first account becomes admin.</p>"
         heading = "Create account"
@@ -282,9 +309,9 @@ def auth_page(
 """
         extra = (
             f'<p style="margin-top:1rem">Already have an account? '
-            f'<a href="/login{next_q}">Log in</a></p>'
+            f'<a href="{_u(url, f"/login{next_q}")}">Log in</a></p>'
         )
-        endpoint = "/api/auth/register"
+        endpoint = _u(url, "/api/auth/register")
 
     body = f"""
 <h2>{heading}</h2>
@@ -315,56 +342,59 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {{
     return _page_shell(f"{title} — {heading}", body, narrow=True)
 
 
-def admin_users_page() -> str:
-    body = """
+def admin_users_page(*, url: UrlFn | None = None) -> str:
+    api_users = _u(url, "/api/users")
+    login_href = _u(url, "/login")
+    catalog_href = _u(url, "/")
+    body = f"""
 <h2>User management</h2>
-<p><a href="/">← Catalog</a></p>
+<p><a href="{catalog_href}">← Catalog</a></p>
 <table id="users-table">
   <thead><tr><th>ID</th><th>Email</th><th>Username</th><th>Role</th><th>Active</th><th></th></tr></thead>
   <tbody></tbody>
 </table>
 <script>
-async function loadUsers() {
-  const res = await fetch('/api/users', { credentials: 'same-origin' });
-  if (!res.ok) { location.href = '/login'; return; }
+async function loadUsers() {{
+  const res = await fetch('{api_users}', {{ credentials: 'same-origin' }});
+  if (!res.ok) {{ location.href = '{login_href}'; return; }}
   const users = await res.json();
   const tbody = document.querySelector('#users-table tbody');
   tbody.innerHTML = users.map((u) => `
     <tr>
-      <td>${u.id}</td>
-      <td>${u.email}</td>
-      <td>${u.username}</td>
+      <td>${{u.id}}</td>
+      <td>${{u.email}}</td>
+      <td>${{u.username}}</td>
       <td>
-        <select data-id="${u.id}" data-field="role">
-          <option value="learner" ${u.role==='learner'?'selected':''}>learner</option>
-          <option value="instructor" ${u.role==='instructor'?'selected':''}>instructor</option>
-          <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
+        <select data-id="${{u.id}}" data-field="role">
+          <option value="learner" ${{u.role==='learner'?'selected':''}}>learner</option>
+          <option value="instructor" ${{u.role==='instructor'?'selected':''}}>instructor</option>
+          <option value="admin" ${{u.role==='admin'?'selected':''}}>admin</option>
         </select>
       </td>
-      <td><input type="checkbox" data-id="${u.id}" data-field="active" ${u.is_active?'checked':''} /></td>
-      <td><button class="btn danger" data-delete="${u.id}" type="button">Delete</button></td>
+      <td><input type="checkbox" data-id="${{u.id}}" data-field="active" ${{u.is_active?'checked':''}} /></td>
+      <td><button class="btn danger" data-delete="${{u.id}}" type="button">Delete</button></td>
     </tr>`).join('');
-  tbody.querySelectorAll('select, input[type=checkbox]').forEach((el) => {
+  tbody.querySelectorAll('select, input[type=checkbox]').forEach((el) => {{
     el.addEventListener('change', () => patchUser(el.dataset.id));
-  });
-  tbody.querySelectorAll('[data-delete]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+  }});
+  tbody.querySelectorAll('[data-delete]').forEach((btn) => {{
+    btn.addEventListener('click', async () => {{
       if (!confirm('Delete user?')) return;
-      await fetch('/api/users/' + btn.dataset.delete, { method: 'DELETE', credentials: 'same-origin' });
+      await fetch('{api_users}/' + btn.dataset.delete, {{ method: 'DELETE', credentials: 'same-origin' }});
       loadUsers();
-    });
-  });
-}
-async function patchUser(id) {
-  const row = document.querySelector(`[data-id="${id}"][data-field=role]`);
-  const active = document.querySelector(`[data-id="${id}"][data-field=active]`);
-  await fetch('/api/users/' + id, {
+    }});
+  }});
+}}
+async function patchUser(id) {{
+  const row = document.querySelector(`[data-id="${{id}}"][data-field=role]`);
+  const active = document.querySelector(`[data-id="${{id}}"][data-field=active]`);
+  await fetch('{api_users}/' + id, {{
     method: 'PATCH',
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role: row.value, is_active: active.checked }),
-  });
-}
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify({{ role: row.value, is_active: active.checked }}),
+  }});
+}}
 loadUsers();
 </script>
 """

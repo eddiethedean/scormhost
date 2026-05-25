@@ -25,6 +25,7 @@ from scormhost.auth.service import (
     admin_update_user,
     authenticate_user,
     change_password,
+    count_active_admins,
     delete_user,
     get_user_by_id,
     issue_tokens,
@@ -34,6 +35,7 @@ from scormhost.auth.service import (
     rotate_refresh_token,
 )
 from scormhost.config import HostSettings
+from scormhost.db.models import UserRole
 from scormhost.db.session import get_db
 from scormhost.templates import admin_users_page, auth_page
 
@@ -58,6 +60,17 @@ def _token_response(
     return response
 
 
+def _url_for(settings: HostSettings):
+    prefix = settings.api_prefix
+
+    def url(path: str) -> str:
+        if not prefix:
+            return path
+        return f"{prefix}{path}"
+
+    return url
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
@@ -69,6 +82,7 @@ async def login_page(
         allow_registration=settings.allow_registration,
         error=request.query_params.get("error"),
         next_url=safe_next_path(request.query_params.get("next")),
+        url=_url_for(settings),
     )
 
 
@@ -77,14 +91,19 @@ async def register_page(
     request: Request,
     settings: Annotated[HostSettings, Depends(get_settings)],
 ) -> str:
+    url = _url_for(settings)
     if not settings.allow_registration:
-        return RedirectResponse("/login?error=registration+disabled", status_code=302)
+        return RedirectResponse(
+            f"{url('/login')}?error=registration+disabled",
+            status_code=302,
+        )
     return auth_page(
         title=settings.title,
         mode="register",
         allow_registration=True,
         error=request.query_params.get("error"),
         next_url=safe_next_path(request.query_params.get("next")),
+        url=url,
     )
 
 
@@ -168,16 +187,22 @@ async def api_me(user: CurrentUser) -> UserPublic:
 async def api_change_password(
     payload: ChangePasswordRequest,
     user: CurrentUser,
+    settings: Annotated[HostSettings, Depends(get_settings)],
     db: Annotated[Session, Depends(get_db)],
-) -> dict[str, bool]:
+) -> JSONResponse:
     change_password(db, user, payload.current_password, payload.new_password)
     db.commit()
-    return {"ok": True}
+    response = JSONResponse({"ok": True})
+    clear_auth_cookies(response, settings)
+    return response
 
 
 @router.get("/admin/users", response_class=HTMLResponse)
-async def admin_users_html(actor: RequireAdmin) -> str:
-    return admin_users_page()
+async def admin_users_html(
+    actor: RequireAdmin,
+    settings: Annotated[HostSettings, Depends(get_settings)],
+) -> str:
+    return admin_users_page(url=_url_for(settings))
 
 
 @router.get("/api/users", response_model=list[UserPublic])
@@ -212,6 +237,21 @@ async def api_update_user(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     if user.id == actor.user_id and payload.is_active is False:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot deactivate yourself")
+    if user.role == UserRole.admin:
+        admins = count_active_admins(db)
+        demoting = payload.role is not None and payload.role != UserRole.admin
+        deactivating = payload.is_active is False
+        if admins <= 1 and (demoting or deactivating):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Cannot remove or deactivate the last admin",
+            )
+    if user.id == actor.id and payload.role is not None and payload.role != UserRole.admin:
+        if count_active_admins(db) <= 1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Cannot demote yourself as the only admin",
+            )
     admin_update_user(
         db,
         user,
@@ -234,6 +274,11 @@ async def api_delete_user(
     user = get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    if user.role == UserRole.admin and count_active_admins(db) <= 1:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Cannot delete the last admin",
+        )
     delete_user(db, user)
     db.commit()
     return {"ok": True}

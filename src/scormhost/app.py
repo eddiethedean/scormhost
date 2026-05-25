@@ -31,6 +31,7 @@ def create_scorm_app(
     database_url: str | None = None,
     allow_registration: bool = True,
     auto_migrate: bool = True,
+    api_prefix: str | None = None,
 ) -> FastAPI:
     """
     Create a FastAPI app that hosts SCORM 1.2 / 2004 ZIP packages.
@@ -47,7 +48,7 @@ def create_scorm_app(
         title=title,
         allow_upload=allow_upload,
         default_learner_id=default_learner_id,
-        api_prefix=base.api_prefix,
+        api_prefix=api_prefix if api_prefix is not None else base.api_prefix,
         database_url=database_url or base.database_url,
         secret_key=secret_key or base.secret_key,
         jwt_algorithm=base.jwt_algorithm,

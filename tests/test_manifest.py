@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scormhost.manifest import parse_imsmanifest
+from scormhost.manifest import is_scorm_2004_schema, parse_imsmanifest
 
 FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="security-awareness" version="1.0.0"
@@ -25,6 +25,13 @@ FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
   </resources>
 </manifest>
 """
+
+
+def test_is_scorm_2004_schema() -> None:
+    assert is_scorm_2004_schema("1.3") is True
+    assert is_scorm_2004_schema("1.3.1") is True
+    assert is_scorm_2004_schema("CAM 1.3") is True
+    assert is_scorm_2004_schema("1.2") is False
 
 
 def test_parse_scorm12_manifest(tmp_path: Path) -> None:

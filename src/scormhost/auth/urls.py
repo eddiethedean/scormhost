@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from urllib.parse import quote
 
 
@@ -13,8 +14,19 @@ def safe_next_path(raw: str | None, *, default: str = "/") -> str:
     return path
 
 
-def login_url(next_path: str | None = None, *, default_next: str = "/") -> str:
+def login_url(
+    next_path: str | None = None,
+    *,
+    default_next: str = "/",
+    url: Callable[[str], str] | None = None,
+) -> str:
+    def path(p: str) -> str:
+        if url is None:
+            return p
+        return url(p)
+
     target = safe_next_path(next_path, default=default_next)
+    login_path = path("/login")
     if target == default_next:
-        return "/login"
-    return f"/login?next={quote(target, safe='/?:=&')}"
+        return login_path
+    return f"{login_path}?next={quote(target, safe='/?:=&')}"

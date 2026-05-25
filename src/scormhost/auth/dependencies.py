@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -8,7 +9,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from scormhost.auth.guest import guest_learner_id
+from scormhost.auth.guest import ensure_guest_learner_id, valid_guest_learner_id
 from scormhost.auth.security import decode_access_token
 from scormhost.config import HostSettings
 from scormhost.db.models import User, UserRole
@@ -66,7 +67,15 @@ def get_current_user_optional(
     except jwt.PyJWTError:
         return None
 
-    user = db.get(User, int(payload["sub"]))
+    sub = payload.get("sub")
+    if sub is None:
+        return None
+    try:
+        user_id = int(sub)
+    except (TypeError, ValueError):
+        return None
+
+    user = db.get(User, user_id)
     if user is None or not user.is_active:
         return None
     return user
@@ -89,6 +98,7 @@ def resolve_learning_actor(
     user: User | None,
     *,
     guest_id: str | None,
+    request: Request | None = None,
 ) -> Actor:
     """Taking a course: logged-in users save to their account; guests use browser cookie."""
     if user is not None:
@@ -103,7 +113,12 @@ def resolve_learning_actor(
             progress_is_account=True,
         )
 
-    learner = guest_id or settings.default_learner_id
+    if request is not None:
+        learner = ensure_guest_learner_id(request, settings)
+    elif guest_id:
+        learner = guest_id
+    else:
+        learner = f"guest-{secrets.token_urlsafe(12)}"
     return Actor(
         user=None,
         learner_id=learner,
@@ -126,11 +141,7 @@ def get_learning_actor(
             "Log in to take courses and save progress",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return resolve_learning_actor(
-        settings,
-        user,
-        guest_id=guest_learner_id(request, settings),
-    )
+    return resolve_learning_actor(settings, user, guest_id=None, request=request)
 
 
 def require_roles(*roles: UserRole):

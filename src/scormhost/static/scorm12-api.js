@@ -20,10 +20,12 @@
     "cmi.core.session_time": "00:00:00",
   };
 
+  let persistChain = Promise.resolve();
+
   function applyRemote(elements) {
     if (!elements) return;
     for (const [key, value] of Object.entries(elements)) {
-      if (key in data) data[key] = String(value);
+      if (key.startsWith("cmi.")) data[key] = String(value);
     }
   }
 
@@ -35,15 +37,21 @@
     applyRemote(body.elements);
   }
 
-  async function persistRemote() {
+  function persistRemote() {
     const url = new URL(config.cmiUrl, global.location.origin);
-    await fetch(url.toString(), {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ elements: { ...data } }),
-      keepalive: true,
+    persistChain = persistChain.then(async () => {
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ elements: { ...data } }),
+        keepalive: true,
+      });
+      if (!res.ok) {
+        throw new Error("CMI persist failed");
+      }
     });
+    return persistChain;
   }
 
   const API = {
