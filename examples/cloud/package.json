@@ -6,6 +6,6 @@
     "build:course": "cd course && npx @lxpack/cli build --target scorm12 && cp .lxpack/security-awareness-scorm12.zip ../bundled/"
   },
   "devDependencies": {
-    "@lxpack/cli": "^0.3.4"
+    "@lxpack/cli": "^0.3.5"
   }
 }

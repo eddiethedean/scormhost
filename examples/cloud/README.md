@@ -31,7 +31,9 @@ npm install
 npm run build:course
 ```
 
-This runs `lxpack build --target scorm12` and copies the ZIP to `bundled/`.
+This runs `lxpack build --target scorm12` (requires **@lxpack/cli 0.3.5+** for a working browser runtime) and copies the ZIP to `bundled/`.
+
+If you already seeded an older bundle locally, remove `data/packages/security-awareness` and restart so the app re-ingests the updated ZIP.
 
 ## Deploy to FastAPI Cloud
 
