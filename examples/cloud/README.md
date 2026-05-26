@@ -31,7 +31,7 @@ npm install
 npm run build:course
 ```
 
-This runs `lxpack build --target scorm12` (requires **@lxpack/cli 0.3.5+** for a working browser runtime) and copies the ZIP to `bundled/`.
+This runs `lxpack build --target scorm12` via the local `node_modules` CLI (not `npx`, which can pull an older runtime). Requires **@lxpack/cli 0.3.5+** with a self-contained runtime bundle (no `import … from "@lxpack/validators"` in `lxpack-runtime.js`). After upgrading LXPack, copy a rebuilt `@lxpack/runtime` `dist/client.js` into `node_modules` if needed, then run `npm run build:course`.
 
 If you already seeded an older bundle locally, remove `data/packages/security-awareness` and restart so the app re-ingests the updated ZIP.
 

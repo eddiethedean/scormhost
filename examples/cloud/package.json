@@ -3,7 +3,7 @@
   "private": true,
   "description": "FastAPI Cloud example with bundled LXPack demo course",
   "scripts": {
-    "build:course": "cd course && npx @lxpack/cli build --target scorm12 && cp .lxpack/security-awareness-scorm12.zip ../bundled/"
+    "build:course": "cd course && ../node_modules/.bin/lxpack build --target scorm12 && cp .lxpack/security-awareness-scorm12.zip ../bundled/"
   },
   "devDependencies": {
     "@lxpack/cli": "^0.3.5"
