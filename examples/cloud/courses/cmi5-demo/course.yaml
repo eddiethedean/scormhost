@@ -1,0 +1,28 @@
+title: cmi5 Demo
+version: 1.0.0
+description: Demonstrates cmi5 packaging and xAPI tracking in LXPack
+
+runtime:
+  theme: modern
+
+tracking:
+  completion:
+    threshold: 0.9
+  xapi:
+    activityIri: "https://example.test/courses/cmi5-demo"
+    displayName: cmi5 Demo
+
+lessons:
+  - id: welcome
+    title: Welcome
+    type: markdown
+    file: lessons/welcome.md
+
+  - id: phishing-lab
+    title: Phishing Lab
+    type: html
+    path: interactions/phishing-lab
+
+assessments:
+  - id: final_quiz
+    file: assessments/final.yaml

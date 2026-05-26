@@ -1,0 +1,28 @@
+title: xAPI Awareness
+version: 1.0.0
+description: An LXPack sample course demonstrating xAPI export and tracking
+
+runtime:
+  theme: modern
+
+tracking:
+  completion:
+    threshold: 0.9
+  xapi:
+    activityIri: "https://example.test/courses/xapi-awareness"
+    displayName: xAPI Awareness
+
+lessons:
+  - id: welcome
+    title: Welcome
+    type: markdown
+    file: lessons/welcome.md
+
+  - id: phishing-lab
+    title: Phishing Lab
+    type: html
+    path: interactions/phishing-lab
+
+assessments:
+  - id: final_quiz
+    file: assessments/final.yaml

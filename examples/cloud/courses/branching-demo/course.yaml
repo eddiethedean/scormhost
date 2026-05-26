@@ -1,0 +1,50 @@
+title: Branching Demo
+version: 1.0.0
+description: Demonstrates variables, flow, components, and quiz retakes
+
+variables:
+  path:
+    default: intro
+    type: string
+
+flow:
+  - when:
+      variable:
+        eq: [path, advanced]
+    goto: component_lesson
+  - when:
+      assessment:
+        passed: final_quiz
+    goto: wrap_up
+
+lessons:
+  - id: intro
+    title: Introduction
+    type: markdown
+    file: lessons/intro.md
+
+  - id: choose_path
+    title: Choose your path
+    type: html
+    path: interactions/choose-path
+
+  - id: component_lesson
+    title: Component callout
+    type: component
+    component: callout
+    props:
+      variant: info
+      body: You chose the advanced path.
+
+  - id: wrap_up
+    title: Wrap up
+    type: markdown
+    file: lessons/wrap-up.md
+
+assessments:
+  - id: final_quiz
+    file: assessments/final.yaml
+
+tracking:
+  completion:
+    threshold: 0.8

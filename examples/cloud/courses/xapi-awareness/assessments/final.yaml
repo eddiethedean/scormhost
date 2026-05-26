@@ -1,0 +1,24 @@
+id: final_quiz
+title: Final Quiz
+passingScore: 0.7
+questions:
+  - id: q1
+    prompt: What is a common sign of a phishing email?
+    choices:
+      - id: a
+        text: Urgent language demanding immediate action
+        correct: true
+      - id: b
+        text: A message from your company's IT department with your name
+      - id: c
+        text: A calendar invitation for a team meeting
+  - id: q2
+    prompt: What should you do if you suspect a phishing email?
+    choices:
+      - id: a
+        text: Click the link to verify it is safe
+      - id: b
+        text: Report it to your security team
+        correct: true
+      - id: c
+        text: Forward it to all colleagues as a warning

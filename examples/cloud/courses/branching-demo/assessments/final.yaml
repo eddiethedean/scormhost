@@ -1,0 +1,16 @@
+id: final_quiz
+title: Final Quiz
+passingScore: 0.7
+maxAttempts: 3
+shuffleChoices: true
+showFeedback: immediate
+questions:
+  - id: q1
+    prompt: What does LXPack compile?
+    choices:
+      - id: a
+        text: Learning experiences
+        correct: true
+      - id: b
+        text: Spreadsheets
+    explanation: LXPack packages web-native courses for LMS deployment.

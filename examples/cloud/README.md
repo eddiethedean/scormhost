@@ -1,13 +1,14 @@
 # FastAPI Cloud example
 
-Deployable SCORM host with a **bundled demo course** built using [LXPack](https://github.com/eddiethedean/lxpack).
+Deployable SCORM host with **bundled demo courses** built using [LXPack](https://github.com/eddiethedean/lxpack).
 
-## Bundled course
+## Bundled courses
 
-On startup (default), the app ingests `bundled/security-awareness-scorm12.zip` — a SCORM 1.2 package built from the LXPack **Security Awareness** sample in `course/`.
+On startup (default), the app ingests SCORM ZIPs from `bundled/`:
 
-- **Package id:** `security-awareness`
-- **Launch:** `/launch/security-awareness` or from the catalog at `/`
+- **`security-awareness`** (SCORM 1.2) — built from `course/`
+- **`branching-demo`** (SCORM 2004) — built from `courses/branching-demo/`
+- **`xapi-awareness`** (SCORM 1.2) — built from `courses/xapi-awareness/`
 
 Disable seeding with `SCORMHOST_SEED_BUNDLED_COURSE=false`.
 
@@ -28,10 +29,10 @@ Source lives in `course/` (from [lxpack/examples/security-awareness](https://git
 ```bash
 cd examples/cloud
 npm install
-npm run build:course
+npm run build:all
 ```
 
-This runs `lxpack build --target scorm12` via the local `node_modules` CLI (not `npx`, which can pull an older runtime). Requires **@lxpack/cli 0.3.5+** with a self-contained runtime bundle (no `import … from "@lxpack/validators"` in `lxpack-runtime.js`). After upgrading LXPack, copy a rebuilt `@lxpack/runtime` `dist/client.js` into `node_modules` if needed, then run `npm run build:course`.
+This runs `lxpack build` via the local `node_modules` CLI (not `npx`, which can pull an unexpected runtime). Requires **@lxpack/cli 0.3.5+** with a self-contained runtime bundle (no `import … from "@lxpack/validators"` in `lxpack-runtime.js`).
 
 If you already seeded an older bundle locally, remove `data/packages/security-awareness` and restart so the app re-ingests the updated ZIP.
 

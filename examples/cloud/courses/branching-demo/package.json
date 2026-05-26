@@ -1,0 +1,6 @@
+{
+  "name": "branching-demo-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LXPack v0.2 example: variables, flow, components, quiz retakes, SCORM 2004"
+}

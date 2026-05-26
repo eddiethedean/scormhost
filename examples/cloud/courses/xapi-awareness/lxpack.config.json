@@ -1,0 +1,8 @@
+{
+  "exports": {
+    "defaultTarget": "xapi"
+  },
+  "output": {
+    "dir": ".lxpack"
+  }
+}

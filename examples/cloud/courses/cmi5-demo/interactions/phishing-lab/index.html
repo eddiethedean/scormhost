@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phishing Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --lab-bg: #f8fafc;
+      --lab-surface: #ffffff;
+      --lab-elev: #f1f5f9;
+      --lab-text: #0f172a;
+      --lab-muted: #475569;
+      --lab-border: #e2e8f0;
+      --lab-accent: #2563eb;
+      --lab-accent-2: #7c3aed;
+      --lab-success: #16a34a;
+      --lab-danger: #dc2626;
+      --lab-radius: 12px;
+      --lab-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto;
+      max-width: 48rem;
+      padding: 2.25rem 1.5rem;
+      font-family: var(--lab-font);
+      background: var(--lab-bg);
+      color: var(--lab-text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: 18rem 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .shell { grid-template-columns: 1fr; }
+    }
+    .card {
+      border: 1px solid var(--lab-border);
+      border-radius: 16px;
+      background: var(--lab-surface);
+      box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+      overflow: hidden;
+    }
+    .topbar {
+      padding: 1.15rem 1.25rem;
+      background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(124,58,237,0.08));
+      border-bottom: 1px solid var(--lab-border);
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 750; letter-spacing: -0.02em; }
+    .sub { margin-top: 0.35rem; color: var(--lab-muted); font-size: 0.98rem; }
+    .paneTitle {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--lab-border);
+      font-weight: 650;
+      font-size: 0.95rem;
+      color: var(--lab-muted);
+      background: var(--lab-elev);
+    }
+    .list { padding: 0.5rem; }
+    .row {
+      width: 100%;
+      text-align: left;
+      display: grid;
+      gap: 0.15rem;
+      padding: 0.85rem 0.9rem;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      transition: background 0.15s, border-color 0.15s, transform 0.08s;
+    }
+    .row:hover { background: rgba(2,6,23,0.03); }
+    .row:active { transform: translateY(1px); }
+    .row[aria-selected="true"] {
+      background: rgba(37,99,235,0.08);
+      border-color: rgba(37,99,235,0.25);
+    }
+    .meta { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; }
+    .from { font-weight: 700; }
+    .time { color: var(--lab-muted); font-size: 0.9rem; }
+    .subject { font-weight: 650; }
+    .snippet { color: var(--lab-muted); font-size: 0.95rem; }
+
+    .content { padding: 1.1rem 1.25rem 1.25rem; }
+    .hdr { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; margin-bottom: 0.75rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 650;
+      border: 1px solid var(--lab-border);
+      background: var(--lab-elev);
+      color: var(--lab-muted);
+    }
+    .badge.dot::before {
+      content: "";
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 999px;
+      background: var(--lab-muted);
+      display: inline-block;
+    }
+    .kv { margin: 0.75rem 0 1rem; padding: 0.85rem 0.9rem; border: 1px dashed var(--lab-border); border-radius: 14px; background: rgba(241,245,249,0.65); }
+    .kv b { font-weight: 700; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.9rem; }
+    button.action {
+      padding: 0.62rem 0.9rem;
+      border-radius: 14px;
+      border: 1px solid var(--lab-border);
+      background: var(--lab-surface);
+      color: var(--lab-text);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
+    }
+    button.action:hover, button.action:focus-visible {
+      border-color: rgba(37,99,235,0.55);
+      box-shadow: 0 4px 14px rgb(37 99 235 / 12%);
+      outline: none;
+    }
+    button.action:active { transform: translateY(1px); }
+    button.primary {
+      background: linear-gradient(135deg, var(--lab-accent), var(--lab-accent-2));
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .result {
+      margin-top: 1rem;
+      padding: 0.9rem 0.95rem;
+      border-radius: 14px;
+      display: none;
+      border: 1px solid var(--lab-border);
+      background: var(--lab-elev);
+      color: var(--lab-text);
+    }
+    .result.show { display: block; }
+    .result.ok { border-color: rgba(22,163,74,0.35); background: rgba(22,163,74,0.08); }
+    .result.bad { border-color: rgba(220,38,38,0.35); background: rgba(220,38,38,0.08); }
+    .result .title { font-weight: 750; margin-bottom: 0.25rem; }
+    .result ul { margin: 0.5rem 0 0; padding-left: 1.1rem; color: var(--lab-muted); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="topbar">
+      <h1>Phishing detection lab</h1>
+      <div class="sub">Review a message and choose the safest action.</div>
+    </div>
+    <div class="content shell" aria-label="Inbox and message viewer">
+      <div class="card" aria-label="Inbox">
+        <div class="paneTitle">Inbox</div>
+        <div class="list">
+          <button class="row" id="msg1" type="button" aria-selected="true">
+            <div class="meta">
+              <div class="from">PayPal Security</div>
+              <div class="time">9:14 AM</div>
+            </div>
+            <div class="subject">Urgent: verify your account</div>
+            <div class="snippet">We noticed unusual activity. Confirm now to avoid suspension…</div>
+          </button>
+          <button class="row" type="button" aria-selected="false" disabled style="opacity:.55; cursor:not-allowed;">
+            <div class="meta">
+              <div class="from">Facilities</div>
+              <div class="time">Yesterday</div>
+            </div>
+            <div class="subject">Planned maintenance</div>
+            <div class="snippet">Air handling shutdown 6–8 PM. No action required.</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="card" aria-label="Message details">
+        <div class="paneTitle">Message</div>
+        <div class="content">
+          <div class="hdr">
+            <span class="badge dot" id="riskBadge">Review carefully</span>
+            <span class="badge">Training sandbox</span>
+          </div>
+
+          <div class="kv" aria-label="Email headers">
+            <div><b>From:</b> security@paypa1-verify.com</div>
+            <div><b>To:</b> you@company.com</div>
+            <div><b>Subject:</b> URGENT: Your account will be suspended</div>
+          </div>
+
+          <p style="margin:0; color:var(--lab-text);">
+            We detected unusual sign-in activity. To keep your account active, verify your identity immediately.
+          </p>
+          <p style="margin:0.65rem 0 0; color:var(--lab-muted);">
+            This message uses urgency and a look‑alike domain. What should you do?
+          </p>
+
+          <div class="actions" role="group" aria-label="Actions">
+            <button class="action primary" id="report" type="button">Report phishing</button>
+            <button class="action" id="open" type="button">Open link</button>
+            <button class="action" id="reply" type="button">Reply to sender</button>
+          </div>
+
+          <div class="result" id="result" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const report = document.getElementById('report');
+    const open = document.getElementById('open');
+    const reply = document.getElementById('reply');
+    const result = document.getElementById('result');
+    const riskBadge = document.getElementById('riskBadge');
+
+    function track(action) {
+      window.parent.lxpack?.track({ type: 'interaction', id: 'phishing-lab', data: { action } });
+    }
+
+    function show(kind, title, bullets) {
+      result.className = `result show ${kind}`;
+      result.innerHTML =
+        `<div class="title">${title}</div>` +
+        (bullets?.length ? `<ul>${bullets.map((b) => `<li>${b}</li>`).join('')}</ul>` : '');
+    }
+
+    report.addEventListener('click', () => {
+      riskBadge.textContent = 'Correct choice';
+      riskBadge.style.color = 'var(--lab-success)';
+      riskBadge.style.borderColor = 'rgba(22,163,74,0.35)';
+      track('report');
+      show('ok', 'Nice work — report it.', [
+        'The domain is a look‑alike: `paypa1-verify.com` (1 instead of l).',
+        'Urgency (“URGENT”, “suspended”) is a classic social‑engineering tactic.',
+        'Reporting protects others and keeps you out of the attacker’s flow.',
+      ]);
+    });
+
+    open.addEventListener('click', () => {
+      riskBadge.textContent = 'Risky action';
+      riskBadge.style.color = 'var(--lab-danger)';
+      riskBadge.style.borderColor = 'rgba(220,38,38,0.35)';
+      track('open_link');
+      show('bad', 'Not recommended — don’t click.', [
+        'Links can lead to credential‑harvesting pages or malware.',
+        'Use a known-good path: type the site manually or use a bookmark.',
+        'Report to your security team instead.',
+      ]);
+    });
+
+    reply.addEventListener('click', () => {
+      riskBadge.textContent = 'Risky action';
+      riskBadge.style.color = 'var(--lab-danger)';
+      riskBadge.style.borderColor = 'rgba(220,38,38,0.35)';
+      track('reply');
+      show('bad', 'Avoid replying to suspicious senders.', [
+        'Replies confirm your address is active and may trigger more attacks.',
+        'If you need to verify, contact the company via an official channel.',
+      ]);
+    });
+  </script>
+</body>
+</html>

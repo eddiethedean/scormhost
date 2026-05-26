@@ -1,0 +1,8 @@
+{
+  "exports": {
+    "defaultTarget": "cmi5"
+  },
+  "output": {
+    "dir": ".lxpack"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "exports": {
+    "defaultTarget": "scorm2004"
+  },
+  "output": {
+    "dir": ".lxpack"
+  }
+}
